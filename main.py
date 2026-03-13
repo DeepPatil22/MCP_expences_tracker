@@ -37,6 +37,8 @@ def init_db():
         print(f"Database initialization error: {e}", file=sys.stderr)
         raise
 
+mcp = FastMCP("ExpenseTracker")
+
 # Initialize database
 init_db()
 
@@ -134,4 +136,4 @@ def categories():
 if __name__ == "__main__":
     # Get port from environment (standard for cloud deploys)
     port = int(os.getenv("PORT", 8000)) 
-    mcp.run(transport="http", host="0.0.0.0", port=port))
+    mcp.run(transport="http", host="0.0.0.0", port=port)
