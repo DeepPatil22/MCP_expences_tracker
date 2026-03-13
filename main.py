@@ -6,15 +6,15 @@ import tempfile
 TEMP_DIR = tempfile.gettempdir()
 DB_PATH = os.path.join(TEMP_DIR, "expenses.db")
 CATEGORIES_PATH = os.path.join(os.path.dirname(__file__), "categories.json")
+import sys  # Required for stderr logging
+import sqlite3
 
-print(f"Database path: {DB_PATH}")
-
-mcp = FastMCP("ExpenseTracker")
-
-def init_db():  # Keep as sync for initialization
+def init_db():
     try:
-        # Use synchronous sqlite3 just for initialization
-        import sqlite3
+        # Use sys.stderr.write or the 'file' argument in print
+        # This prevents the text from interfering with the MCP protocol
+        print(f"Database path: {DB_PATH}", file=sys.stderr)
+        
         with sqlite3.connect(DB_PATH) as c:
             c.execute("PRAGMA journal_mode=WAL")
             c.execute("""
@@ -30,12 +30,14 @@ def init_db():  # Keep as sync for initialization
             # Test write access
             c.execute("INSERT OR IGNORE INTO expenses(date, amount, category) VALUES ('2000-01-01', 0, 'test')")
             c.execute("DELETE FROM expenses WHERE category = 'test'")
-            print("Database initialized successfully with write access")
+            
+            print("Database initialized successfully with write access", file=sys.stderr)
     except Exception as e:
-        print(f"Database initialization error: {e}")
+        # Crucial to print errors to stderr so they show up in your server logs
+        print(f"Database initialization error: {e}", file=sys.stderr)
         raise
 
-# Initialize database synchronously at module load
+# Initialize database
 init_db()
 
 @mcp.tool()
@@ -54,7 +56,8 @@ async def add_expense(date, amount, category, subcategory="", note=""):  # Chang
         if "readonly" in str(e).lower():
             return {"status": "error", "message": "Database is in read-only mode. Check file permissions."}
         return {"status": "error", "message": f"Database error: {str(e)}"}
-    
+
+
 @mcp.tool()
 async def list_expenses(start_date, end_date):  # Changed: added async
     '''List expense entries within an inclusive date range.'''
@@ -73,6 +76,7 @@ async def list_expenses(start_date, end_date):  # Changed: added async
             return [dict(zip(cols, r)) for r in await cur.fetchall()]  # Changed: added await
     except Exception as e:
         return {"status": "error", "message": f"Error listing expenses: {str(e)}"}
+
 
 @mcp.tool()
 async def summarize(start_date, end_date, category=None):  # Changed: added async
@@ -128,5 +132,6 @@ def categories():
 
 # Start the server
 if __name__ == "__main__":
-    mcp.run(transport="http", host="0.0.0.0", port=8000)
-    # mcp.run()
+    # Get port from environment (standard for cloud deploys)
+    port = int(os.getenv("PORT", 8000)) 
+    mcp.run(transport="http", host="0.0.0.0", port=port))
